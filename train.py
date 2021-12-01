@@ -150,7 +150,7 @@ class Train():
                 loss_g_vgg_style = self.criterionVGG(image.detach(), fake_image) * 0.1
 
                 loss_g_feat = 0
-                pred_fake = self.netD(torch.cat([fake_image, input_mask_org], 1))
+                pred_fake = self.netD(torch.cat([fake_image, input_mask_ref], 1))
                 pred_real = self.netD(torch.cat([image, input_mask_org], 1))
                 num_D = len(pred_fake)
                 for i in range(num_D):
