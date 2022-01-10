@@ -12,7 +12,7 @@ from torch import autograd
 from tqdm import tqdm
 import os
 warnings.filterwarnings('ignore')
-os.environ["CUDA_VISIBLE_DEVICES"] = "0, 1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 class Train():
 
@@ -50,10 +50,6 @@ class Train():
         self.netD = MultiscaleDiscriminator().cuda()
         self.netD2 = MultiscaleDiscriminator2().cuda()
         self.netD3 = MultiscaleDiscriminator2().cuda()
-        self.netG = torch.nn.DataParallel(self.netG)
-        self.netD = torch.nn.DataParallel(self.netD)
-        self.netD2 = torch.nn.DataParallel(self.netD2)
-        self.netD3 = torch.nn.DataParallel(self.netD3)
 
         self.criterionL1 = torch.nn.L1Loss()
         self.criterionL2 = torch.nn.MSELoss()
