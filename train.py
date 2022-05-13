@@ -12,7 +12,7 @@ from torch import autograd
 from tqdm import tqdm
 import os
 warnings.filterwarnings('ignore')
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0, 1"
 
 class Train():
 
@@ -50,6 +50,10 @@ class Train():
         self.netD = MultiscaleDiscriminator().cuda()
         self.netD2 = MultiscaleDiscriminator2().cuda()
         self.netD3 = MultiscaleDiscriminator2().cuda()
+        self.netG = torch.nn.DataParallel(self.netG)
+        self.netD = torch.nn.DataParallel(self.netD)
+        self.netD2 = torch.nn.DataParallel(self.netD2)
+        self.netD3 = torch.nn.DataParallel(self.netD3)
 
         self.criterionL1 = torch.nn.L1Loss()
         self.criterionL2 = torch.nn.MSELoss()
@@ -69,16 +73,12 @@ class Train():
         writer = SummaryWriter(self.tensorboard_path)
         for iter in range(1, self.max_epoch + 1):
             for idx, data in tqdm(enumerate(dataloader, 0)):
-                image, image_bg, labels, labels_ori, image11, image22 = data[0], data[1], data[2], data[3], data[4], data[5]
+                image, image_bg, labels_ori, image11, image22 = data[0], data[1], data[2], data[3], data[4], data[5]
 
                 size = labels.size()
                 oneHot_size = (size[0], self.semantic_nc, size[2], size[3])
                 labels_real = torch.cuda.FloatTensor(torch.Size(oneHot_size)).zero_()
                 input_mask_org = labels_real.scatter_(1, labels_ori.data.long().cuda(), 1.0)
-
-                oneHot_size = (size[0], self.semantic_nc, size[2], size[3])
-                labels_ref = torch.cuda.FloatTensor(torch.Size(oneHot_size)).zero_()
-                input_mask_ref = labels_ref.scatter_(1, labels.data.long().cuda(), 1.0)
 
                 image = image.cuda()
                 image_bg = image_bg.cuda()
@@ -146,7 +146,7 @@ class Train():
                 loss_g_vgg_style = self.criterionVGG(image.detach(), fake_image) * 0.1
 
                 loss_g_feat = 0
-                pred_fake = self.netD(torch.cat([fake_image, input_mask_ref], 1))
+                pred_fake = self.netD(torch.cat([fake_image, input_mask_org], 1))
                 pred_real = self.netD(torch.cat([image, input_mask_org], 1))
                 num_D = len(pred_fake)
                 for i in range(num_D):
@@ -154,7 +154,7 @@ class Train():
                     for j in range(num_intermediate_outputs):
                         unweighted_loss = self.criterionL1(pred_fake[i][j], pred_real[i][j].detach())
                         loss_g_feat += unweighted_loss
-                loss_g = loss_g_gan + loss_g_feat + loss_g_gan2
+                loss_g = loss_g_gan + loss_g_feat + loss_g_gan2 + loss_g_vgg_style
 
                 loss_g.backward()
                 optimizer_g.step()
@@ -180,14 +180,12 @@ class Train():
                                   global_step=len(dataloader) * (iter - 1) + idx)
 
                 mask_colors_org = generate_label_color(input_mask_org, self.image_size, self.semantic_nc)
-                mask_colors_ref = generate_label_color(input_mask_ref, self.image_size, self.semantic_nc)
 
-                tensor_lsit = [image, fake_image, mask_colors_org, mask_colors_ref]
+                tensor_lsit = [image, fake_image, mask_colors_org]
                 visual(tensor_lsit, writer, len(dataloader)*(iter-1)+idx)
                 
                 image_com = mask_colors_org.detach().float()
                 image_com = torch.cat([image_com, image.detach().cpu()], 0)
-                image_com = torch.cat([image_com, mask_colors_ref.float().detach().cpu()], 0)
                 image_com = torch.cat([image_com, fake_image.detach().cpu()], 0)
                 if (len(dataloader)*(iter-1)+idx) % 1000 == 0:
                     save_image(image_com.data, os.path.join(self.samples_path, 'real_samples_%06d.jpg'% (len(dataloader)*(iter-1)+idx)), nrow=self.batch_size, normalize=True)

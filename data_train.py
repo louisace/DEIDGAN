@@ -81,7 +81,7 @@ class Data_train(data.Dataset):
         image11 = self.image_transforms(image11)
         image22 = self.image_transforms(image22)
 
-        return train_images, train_images_bg, mask_images_ref, mask_images_ori, image11, image22
+        return train_images, train_images_bg, mask_images_ori, image11, image22
 
     def __len__(self):
         return len(self.imgs)
